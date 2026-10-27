@@ -27,7 +27,7 @@ MIN_SCORE = 0.50
 
 ROLES = ["الكل", "موظف", "مبيعات", "مدير", "مؤسس"]
 
-# --- منطق البحث والتحليل (مدمج بالكامل ليعمل بدون API خارجي) ---
+# --- منطق البحث والتحليل ---
 
 STOP_WORDS = {
     "هل", "ما", "ماذا", "كيف", "كم", "متى", "من",
@@ -99,9 +99,7 @@ def is_allowed(audience_cell: str, role: str) -> bool:
 
 def search_knowledge(question: str, role: str):
     q_words = keywords(question)
-    if not q_words:
-        return {"status": "no_answer", "answer": None, "sources": []}
-    if not EXCEL_PATH.exists():
+    if not q_words or not EXCEL_PATH.exists():
         return {"status": "no_answer", "answer": None, "sources": []}
 
     matches = []
@@ -183,12 +181,12 @@ def search_knowledge(question: str, role: str):
         }]
     }
 
-# --- واجهة المستخدم (Streamlit) ---
+# --- واجهة المستخدم ---
 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
-:root { --purple: #734F96; --purple-dark: #4E3565; --orange: #EDA155; --paper: #FAF7F2; --white: #FFFFFF; --ink: #30253A; --muted: #82778A; --line: #E9E1EB; --green: #477653; }
+:root { --purple: #734F96; --orange: #EDA155; --paper: #FAF7F2; --white: #FFFFFF; --ink: #30253A; --muted: #82778A; --line: #E9E1EB; }
 html, body, [class*="css"] { font-family: 'IBM Plex Sans Arabic', sans-serif; }
 .stApp { background: radial-gradient(ellipse at 90% 0%, #F0E7F5 0%, transparent 35%), var(--paper); color: var(--ink); }
 .block-container { max-width: 790px; padding-top: 2rem; padding-bottom: 2rem; }
@@ -250,4 +248,40 @@ if search_clicked:
         if data.get("status") == "ok" and data.get("answer"):
             st.markdown("""
             <div style="margin-top: 2rem; text-align: right;">
-                <div style="color: #477653; font-size: 12px; font-weight: 600; margin-bottom: 12
+                <div style="color: #477653; font-size: 12px; font-weight: 600; margin-bottom: 12px;">● تم العثور على إجابة في المستندات</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div class="answer-card">
+                <div style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">الإجابة</div>
+                <div class="answer-text">{safe_text(data["answer"])}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            sources = data.get("sources") or []
+            if sources:
+                st.markdown('<div style="font-size: 14px; font-weight: 700; margin: 23px 0 10px; text-align: right;">مصدر المعلومة</div>', unsafe_allow_html=True)
+                for s in sources:
+                    meta = []
+                    if s.get("id"): meta.append(f"المعرّف: {s['id']}")
+                    if s.get("updated"): meta.append(f"آخر تحديث: {s['updated']}")
+                    if s.get("line"): meta.append(f"رقم الصف: {s['line']}")
+                    
+                    link_html = f'<a href="{safe_url(s["source"])}" target="_blank" style="color: #734F96; font-weight: 600; text-decoration: none; display: block; margin-top: 8px;">فتح المصدر ↗</a>' if safe_url(s["source"]) else ""
+                    
+                    st.markdown(f"""
+                    <div class="source-card">
+                        <div style="font-weight: 600; font-size: 13px;">{safe_text(s.get("file"))}</div>
+                        <div style="color: var(--muted); font-size: 11px; margin-top: 5px;">{" · ".join(meta)}</div>
+                        <div style="color: #675873; font-size: 12px; margin-top: 8px;">السؤال المعتمد: {safe_text(s.get("text"))}</div>
+                        {link_html}
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="empty-card">
+                <div style="font-size: 15px; font-weight: 700; margin-bottom: 7px;">لم نجد إجابة مناسبة بعد</div>
+                <div style="color: var(--muted); font-size: 13px;">لم نعثر على معلومة مطابقة في المستندات المتاحة. جرّبي صياغة أخرى أو كلمات أكثر تحديدًا.</div>
+            </div>
+            """, unsafe_allow_html=True)
